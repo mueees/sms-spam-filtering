@@ -2,6 +2,7 @@
   "dependencies": {
     "line-reader": "latest",
     "numeric": "1.2.6",
-    "lodash": "latest"
+    "lodash": "latest",
+    "natural": "0.1.22"
   }
 }
