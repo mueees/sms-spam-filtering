@@ -1,0 +1,10 @@
+Machine learning ex5
+
+1. Regularized cost function
+2. Regularized gradient
+3. Learning curve
+Learning curve plots training and cross validation errors as a function of training set size.
+
+To plot the learning curve, we need a training and cross validation set
+error for different training set sizes.
+
