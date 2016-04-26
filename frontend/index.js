@@ -1,9 +1,10 @@
 var mind = require('../lib/mind'),
     _ = require('lodash'),
-    rawDocuments = require('./data/data.js');
+    rawDocuments = require('./data/octaveFeature.js');
 
-var lambda = 0,
-    maxIterations = 500;
+var lambda = 1,
+    alpha = 0.004,
+    maxIterations = 2300;
 
 function countUpperCaseChars(str) {
     var count = 0, len = str.length;
@@ -43,19 +44,6 @@ function transformDocumentToFeature(document) {
         isContainsLongNumber: Number(containsLongNumber(document.text))
     };
 
-    input.a = input.documentLength * input.documentLength;
-    input.b = input.wordsCount * input.wordsCount;
-    input.c = input.commaCount * input.commaCount;
-    input.d = input.exclamationCount * input.exclamationCount;
-    input.e = input.capitalLetterLength * input.capitalLetterLength;
-    input.g = input.isContainsLongNumber * input.isContainsLongNumber;
-
-    /*input.two_capitalLetterLength = input.capitalLetterLength * input.capitalLetterLength;
-     input.three_capitalLetterLength = input.capitalLetterLength + input.capitalLetterLength;
-
-     input.a = input.isContainsLongNumber * input.capitalLetterLength;
-     input.b = input.isContainsLongNumber + input.capitalLetterLength;*/
-
     return {
         input: input,
         raw: document,
@@ -63,18 +51,51 @@ function transformDocumentToFeature(document) {
     }
 }
 
+function mapFeature(documents, degree) {
+    /*
+     * degree = 6;
+     x0
+     x1 + x2 +
+     x1^2 + x1x2 + x2^2 +
+     x1^3 + x2^3 + x1^2x2 + x1*x2^2x
+     x1^4 + x1^3x2 + x1^2x2^2 + x1x2^3 + x2^4
+     x1^5 + x1^4x2 + x1^3x2^2 + x1^2x2^3 + x1x2^4 + x2^5
+     x1^6 + x1^5x2 + x1^4x2^2 + x1^3x2^3 + x1^2x2^4 + x1x2^5 + x2^6
+     * */
+
+    _.each(documents, function (document) {
+        var input = document.input;
+        var x1 = input[0];
+        var x2 = input[1];
+
+        var resultInput = [];
+
+        for (var i = 1; i <= degree; i++) {
+            for (var k = 0; k <= i; k++) {
+                resultInput.push(Math.pow(x1, (i - k)) * Math.pow(x2, k));
+            }
+        }
+
+        resultInput.unshift(1);
+
+        document.input = resultInput;
+    });
+}
+
 // convert raw documents to features
-var documents = transformToFeature(rawDocuments);
+// var documents = transformToFeature(rawDocuments);
+mapFeature(rawDocuments, 6);
+var documents = rawDocuments;
 var countTrainingDocuments = Math.round(documents.length * 0.7);
 
-var trainingDocuments = _.slice(documents, 0, countTrainingDocuments);
+var trainingDocuments = _.slice(documents, 0/*, countTrainingDocuments*/);
 var testDocuments = _.slice(documents, countTrainingDocuments);
 
 // for cost-vs-iteration chart
 var costVsIterationData = [];
 
 var logisticRegression = new mind.LogisticRegression({
-    alpha: 0.001,
+    alpha: alpha,
     lambda: lambda,
     maxIterations: maxIterations,
     costThreshold: false
@@ -88,11 +109,21 @@ logisticRegression.on('train:after:iteration', function (data) {
     costVsIterationData.push(data);
 });
 
+
 _.each(trainingDocuments, function (trainingDocument) {
     logisticRegression.addTrainingData(trainingDocument);
 });
 
+console.log(logisticRegression.getCost());
+console.log(logisticRegression.getGradient());
+
 logisticRegression.train();
+
+console.log(logisticRegression.getCost());
+
+console.log(_.map(logisticRegression.theta, function (thetaValue) {
+    return thetaValue[0];
+}));
 
 Highcharts.chart('cost-vs-iteration', {
     title: {
@@ -128,6 +159,7 @@ Highcharts.chart('cost-vs-iteration', {
     }]
 });
 
+/*
 function getAccuracy(testDocuments, model) {
     var correctDocuments = [],
         falseDocuments = [];
@@ -236,3 +268,4 @@ Highcharts.chart('learning-curve', {
         }
     ]
 });
+*/
