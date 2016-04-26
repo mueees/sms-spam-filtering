@@ -1,10 +1,10 @@
 var mind = require('../lib/mind'),
     _ = require('lodash'),
-    rawDocuments = require('./data/octaveFeature.js');
+    rawDocuments = require('./data/data.js');
 
-var lambda = 1,
-    alpha = 0.004,
-    maxIterations = 2300;
+var lambda = 0.2,
+    alpha = 0.05,
+    maxIterations = 750;
 
 function countUpperCaseChars(str) {
     var count = 0, len = str.length;
@@ -35,17 +35,17 @@ function transformToFeature(documents) {
 }
 
 function transformDocumentToFeature(document) {
-    var input = {
-        documentLength: document.text.length,
-        wordsCount: wordsCount(document.text),
-        commaCount: commaCount(document.text),
-        exclamationCount: exclamationCount(document.text),
-        capitalLetterLength: countUpperCaseChars(document.text),
-        isContainsLongNumber: Number(containsLongNumber(document.text))
-    };
+    /*var input = {
+     documentLength: document.text.length,
+     wordsCount: wordsCount(document.text),
+     commaCount: commaCount(document.text),
+     exclamationCount: exclamationCount(document.text),
+     capitalLetterLength: countUpperCaseChars(document.text),
+     isContainsLongNumber: Number(containsLongNumber(document.text))
+     };*/
 
     return {
-        input: input,
+        input: [1, countUpperCaseChars(document.text), containsLongNumber(document.text)],
         raw: document,
         output: Number(document.spam)
     }
@@ -63,7 +63,9 @@ function mapFeature(documents, degree) {
      x1^6 + x1^5x2 + x1^4x2^2 + x1^3x2^3 + x1^2x2^4 + x1x2^5 + x2^6
      * */
 
-    _.each(documents, function (document) {
+    var docs = _.cloneDeep(documents);
+
+    _.each(docs, function (document) {
         var input = document.input;
         var x1 = input[0];
         var x2 = input[1];
@@ -80,15 +82,28 @@ function mapFeature(documents, degree) {
 
         document.input = resultInput;
     });
+
+    return docs;
 }
 
 // convert raw documents to features
-// var documents = transformToFeature(rawDocuments);
-mapFeature(rawDocuments, 6);
-var documents = rawDocuments;
-var countTrainingDocuments = Math.round(documents.length * 0.7);
+var featureDocuments = transformToFeature(rawDocuments);
 
-var trainingDocuments = _.slice(documents, 0/*, countTrainingDocuments*/);
+var spamDocs = _.filter(featureDocuments, function (d) {
+    return d.output
+});
+var notSpamDocs = _.filter(featureDocuments, function (d) {
+    return !d.output
+});
+
+var resultDocuments = spamDocs.concat(_.slice(notSpamDocs, 0, spamDocs.length + 100));
+
+var documents = _.shuffle(resultDocuments);
+
+// var documents = mapFeature(rawDocuments, 6);
+var countTrainingDocuments = Math.round(documents.length * 0.75);
+
+var trainingDocuments = _.slice(documents, 0, countTrainingDocuments);
 var testDocuments = _.slice(documents, countTrainingDocuments);
 
 // for cost-vs-iteration chart
@@ -102,28 +117,89 @@ var logisticRegression = new mind.LogisticRegression({
 });
 
 logisticRegression.on('train:after:iteration', function (data) {
-    /*console.log('Iteration: ' + data.iteration);
-     console.log('Cost Value: ' + data.currentCost);
-     console.log('/----------------------/');*/
-
     costVsIterationData.push(data);
 });
-
 
 _.each(trainingDocuments, function (trainingDocument) {
     logisticRegression.addTrainingData(trainingDocument);
 });
 
-console.log(logisticRegression.getCost());
-console.log(logisticRegression.getGradient());
-
 logisticRegression.train();
 
-console.log(logisticRegression.getCost());
+/*Highcharts.chart('boundary', {
+ chart: {},
+ title: {
+ text: 'Raw Data'
+ },
+ xAxis: {
+ title: {
+ enabled: true,
+ text: 'Feature 1'
+ }
+ },
+ yAxis: {
+ title: {
+ text: 'Feature 2'
+ }
+ },
+ legend: {
+ layout: 'vertical',
+ align: 'left',
+ verticalAlign: 'top',
+ x: 100,
+ y: 70,
+ floating: true,
+ backgroundColor: (Highcharts.theme && Highcharts.theme.legendBackgroundColor) || '#FFFFFF',
+ borderWidth: 1
+ },
+ plotOptions: {
+ scatter: {
+ marker: {
+ radius: 5,
+ states: {
+ hover: {
+ enabled: true,
+ lineColor: 'rgb(100,100,100)'
+ }
+ }
+ },
+ states: {
+ hover: {
+ marker: {
+ enabled: false
+ }
+ }
+ },
+ tooltip: {
+ headerFormat: '<b>{series.name}</b><br>',
+ pointFormat: '{point.x} cm, {point.y} kg'
+ }
+ }
+ },
+ series: [
+ {
+ type: 'scatter',
+ name: 'Positive',
+ color: 'rgba(223, 83, 83, .5)',
+ data: _(rawDocuments).filter(function (document) {
+ return Boolean(document.output)
+ }).map(function (document) {
+ return document.input
+ }).value()
 
-console.log(_.map(logisticRegression.theta, function (thetaValue) {
-    return thetaValue[0];
-}));
+ },
+ {
+ type: 'scatter',
+ name: 'Negative',
+ color: 'rgba(119, 152, 191, .5)',
+ data: _(rawDocuments).filter(function (document) {
+ return !Boolean(document.output)
+ }).map(function (document) {
+ return document.input
+ }).value()
+ }
+ ]
+ });*/
 
 Highcharts.chart('cost-vs-iteration', {
     title: {
@@ -159,7 +235,11 @@ Highcharts.chart('cost-vs-iteration', {
     }]
 });
 
-/*
+/**
+ *
+ * Calculate Acuracy
+ * */
+
 function getAccuracy(testDocuments, model) {
     var correctDocuments = [],
         falseDocuments = [];
@@ -191,9 +271,9 @@ console.log('Right Spam Answer: ' + rightSpam.length);
 
 // LEARNING CURVE
 
-var learningCurveData = [];
+/*var learningCurveData = [];
 
-for (var i = 10; i < trainingDocuments.length; i = i + 1000) {
+for (var i = 10; i < trainingDocuments.length; i = i + 300) {
     var stepData = {
         m: i
     };
@@ -267,5 +347,19 @@ Highcharts.chart('learning-curve', {
             })
         }
     ]
+});*/
+
+var btn = document.getElementById('answer');
+var input = document.getElementById('question');
+
+btn.addEventListener('click', function (event) {
+    event.preventDefault();
+
+    var feature = transformDocumentToFeature({
+        text: input.value
+    });
+
+    var prediction = logisticRegression.predict(feature.input);
+
+    console.log(prediction);
 });
-*/

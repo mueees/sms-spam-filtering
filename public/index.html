@@ -3,11 +3,21 @@
 <head lang="en">
     <meta charset="UTF-8">
     <title>Sms spam filtering</title>
+
+    <link rel="stylesheet" href="style.css"/>
 </head>
 <body>
 
-<div id="cost-vs-iteration"></div>
-<div id="learning-curve"></div>
+<div class="charts-container">
+    <div class="chart" id="cost-vs-iteration"></div>
+    <div class="chart" id="boundary"></div>
+    <div class="chart" id="learning-curve"></div>
+</div>
+
+<form action="">
+    <input type="text" id="question"/>
+    <button id="answer">Answer</button>
+</form>
 
 <script src="index.js"></script>
 </body>

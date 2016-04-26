@@ -1,0 +1,5 @@
+.charts-container .chart{
+    width: 30%;
+    display: inline-block;
+    vertical-align: top;
+}
